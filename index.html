@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Med-Synthetix | AI Clinical Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #f0f7ff; }
+        .sidebar { background-color: #ffffff; border-right: 1px solid #dbeafe; }
+        .chat-area { background-color: #ffffff; border-left: 1px solid #dbeafe; }
+        .pdf-viewer { background-color: #e2e8f0; }
+        /* Streaming Cursor Effect */
+        .cursor::after { content: '|'; animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0; } }
+        /* Circular Progress Style */
+        .progress-circle { stroke-dasharray: 100; stroke-dashoffset: 13; transition: stroke-dashoffset 1s ease-in-out; }
+    </style>
+</head>
+<body class="h-full flex flex-col font-sans text-slate-800">
+
+    <header class="bg-blue-600 text-white p-4 flex justify-between items-center shadow-lg">
+        <h1 class="text-xl font-bold">Med-Synthetix</h1>
+        <div class="flex items-center gap-3">
+            <input id="apiKey" type="password" placeholder="Enter Gemini API Key" class="px-3 py-1 rounded text-slate-900 w-64 text-sm" onchange="testApiKey()">
+            <div id="statusIndicator" class="w-3 h-3 rounded-full bg-slate-400"></div>
+        </div>
+    </header>
+
+    <main class="flex-1 flex overflow-hidden">
+        <aside class="sidebar w-72 p-4 flex flex-col gap-4 overflow-y-auto">
+            <h2 class="font-semibold text-blue-900 border-b pb-2">Patient Records</h2>
+            <div id="fileList" class="text-sm text-slate-600 space-y-2">
+                <div class="p-2 bg-blue-50 rounded cursor-pointer hover:bg-blue-100">Patient_A_History.pdf</div>
+                <div class="p-2 bg-blue-50 rounded cursor-pointer hover:bg-blue-100">Trial_Protocol_XYZ.pdf</div>
+            </div>
+            
+            <div class="mt-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                <h3 class="text-xs font-bold text-slate-500 uppercase">Key Clinical Findings</h3>
+                <ul id="findingsList" class="mt-2 text-sm text-slate-700 space-y-1">
+                    <li class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-red-400"></span> Risk: High</li>
+                    <li class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-yellow-400"></span> Biomarker: Pending</li>
+                </ul>
+            </div>
+            
+            <button class="mt-auto bg-blue-600 text-white py-2 rounded shadow hover:bg-blue-700" onclick="analyzeMatch()">Analyze Patient-Trial Match</button>
+        </aside>
+
+        <section class="flex-1 pdf-viewer flex items-center justify-center relative overflow-hidden">
+            <div id="pdfPlaceholder" class="text-slate-500 font-medium">PDF Preview Area</div>
+            <div id="scrollTarget" class="absolute top-0"></div>
+        </section>
+
+        <aside class="chat-area w-96 flex flex-col">
+            <div id="chatBox" class="flex-1 p-4 overflow-y-auto space-y-4">
+                <div class="text-sm bg-blue-100 p-3 rounded-lg">Hello! I am Med-Synthetix. How can I help you analyze these clinical documents today?</div>
+            </div>
+            <div class="p-4 border-t">
+                <input id="userInput" type="text" placeholder="Ask a question..." class="w-full border rounded p-2 focus:ring-2 focus:ring-blue-400 outline-none">
+            </div>
+        </aside>
+    </main>
+
+    <script>
+        const apiKeyInput = document.getElementById('apiKey');
+        const statusIndicator = document.getElementById('statusIndicator');
+
+        async function testApiKey() {
+            const key = apiKeyInput.value;
+            statusIndicator.className = 'w-3 h-3 rounded-full bg-yellow-400';
+            setTimeout(() => {
+                statusIndicator.className = key.length > 10 ? 'w-3 h-3 rounded-full bg-green-500' : 'w-3 h-3 rounded-full bg-red-500';
+            }, 800);
+        }
+
+        async function streamText(element, text) {
+            let i = 0;
+            element.innerHTML = '';
+            while (i < text.length) {
+                element.innerHTML += text.charAt(i);
+                i++;
+                await new Promise(r => setTimeout(r, 20));
+            }
+        }
+
+        async function analyzeMatch() {
+            const chatBox = document.getElementById('chatBox');
+            chatBox.innerHTML += `
+                <div class="text-sm bg-indigo-50 border-l-4 border-indigo-500 p-3 rounded-r-lg space-y-2">
+                    <strong>Match Confidence</strong>
+                    <div class="relative w-24 h-24 mx-auto">
+                        <svg class="w-full h-full" viewBox="0 0 36 36">
+                            <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#eee" stroke-width="3" />
+                            <path class="progress-circle" stroke-dashoffset="13" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#6366f1" stroke-width="3" />
+                        </svg>
+                        <div class="absolute inset-0 flex items-center justify-center font-bold text-indigo-600">87%</div>
+                    </div>
+                    <ul class="list-disc pl-4 mt-2 text-xs text-slate-700">
+                        <li>Matches Age & Weight inclusion criteria.</li>
+                        <li>Patient history shows no conflicts with protocol.</li>
+                    </ul>
+                </div>`;
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        async function getAgenticResponse(query) {
+            const isValid = query.toLowerCase().includes('trial'); 
+            if (isValid) {
+                return "The patient meets 87% of trial requirements. <a href='#' onclick='scrollToPage(4)' class='text-blue-600 underline font-bold'>Source: Page 4, Paragraph 2</a>";
+            } else if (query.toLowerCase().includes('page')) {
+                return "Information not found in document.";
+            }
+            return "I am Med-Synthetix. I can analyze the patient history and trial protocol for you.";
+        }
+
+        document.getElementById('userInput').addEventListener('keypress', async function(e) {
+            if (e.key === 'Enter') {
+                const query = this.value;
+                const chatBox = document.getElementById('chatBox');
+                chatBox.innerHTML += `<div class="text-sm bg-slate-200 p-3 rounded-lg self-end">${query}</div>`;
+                
+                const responseDiv = document.createElement('div');
+                responseDiv.className = "text-sm bg-blue-100 p-3 rounded-lg cursor";
+                chatBox.appendChild(responseDiv);
+                
+                const response = await getAgenticResponse(query);
+                await streamText(responseDiv, response);
+                responseDiv.classList.remove('cursor');
+                
+                chatBox.scrollTop = chatBox.scrollHeight;
+                this.value = '';
+            }
+        });
+
+        function scrollToPage(pageNum) {
+            document.getElementById('scrollTarget').scrollIntoView({ behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>
